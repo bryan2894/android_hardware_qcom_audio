@@ -794,6 +794,8 @@ int select_devices(struct audio_device *adev, audio_usecase_t uc_id)
 {
     snd_device_t out_snd_device = SND_DEVICE_NONE;
     snd_device_t in_snd_device = SND_DEVICE_NONE;
+    snd_device_t prev_out_snd_device = SND_DEVICE_NONE;
+    snd_device_t prev_in_snd_device = SND_DEVICE_NONE;
     struct audio_usecase *usecase = NULL;
     struct audio_usecase *vc_usecase = NULL;
     struct audio_usecase *voip_usecase = NULL;
@@ -895,7 +897,9 @@ int select_devices(struct audio_device *adev, audio_usecase_t uc_id)
      * and enable both RX and TX devices though one of them is same as current
      * device.
      */
-    if (usecase->type == VOICE_CALL || usecase->type == VOIP_CALL) {
+    if ((usecase->type == VOICE_CALL) &&
+        (usecase->in_snd_device != SND_DEVICE_NONE) &&
+        (usecase->out_snd_device != SND_DEVICE_NONE)) {
         status = platform_switch_voice_call_device_pre(adev->platform);
     }
 
@@ -929,6 +933,12 @@ int select_devices(struct audio_device *adev, audio_usecase_t uc_id)
         enable_audio_route_for_voice_usecases(adev, usecase);
     }
 
+    /* Cache the current usecase devices. This is required to avoid
+     * sending device enable command to the external modem.
+     */
+    prev_in_snd_device = usecase->in_snd_device;
+    prev_out_snd_device = usecase->out_snd_device;
+
     usecase->in_snd_device = in_snd_device;
     usecase->out_snd_device = out_snd_device;
 
@@ -942,10 +952,13 @@ int select_devices(struct audio_device *adev, audio_usecase_t uc_id)
      * Enable device command should be sent to modem only after
      * enabling voice call mixer controls
      */
-    if (usecase->type == VOICE_CALL)
+    if ((usecase->type == VOICE_CALL) &&
+        (prev_in_snd_device != SND_DEVICE_NONE) &&
+        (prev_out_snd_device != SND_DEVICE_NONE)) {
         status = platform_switch_voice_call_usecase_route_post(adev->platform,
                                                                out_snd_device,
                                                                in_snd_device);
+    }
 
     ALOGD("%s: done",__func__);
 

@@ -2289,6 +2289,7 @@ static int in_standby(struct audio_stream *stream)
             pcm_close(in->pcm);
             in->pcm = NULL;
         }
+        adev->enable_voicerx = false;
         status = stop_input_stream(in);
         pthread_mutex_unlock(&adev->lock);
     }
@@ -2509,6 +2510,7 @@ static int add_remove_audio_effect(const struct audio_stream *stream,
                                    bool enable)
 {
     struct stream_in *in = (struct stream_in *)stream;
+    struct audio_device *adev = in->dev;
     int status = 0;
     effect_descriptor_t desc;
 
@@ -2522,6 +2524,16 @@ static int add_remove_audio_effect(const struct audio_stream *stream,
             in->enable_aec != enable &&
             (memcmp(&desc.type, FX_IID_AEC, sizeof(effect_uuid_t)) == 0)) {
         in->enable_aec = enable;
+        adev->enable_voicerx = enable;
+        struct audio_usecase *usecase;
+        struct listnode *node;
+        list_for_each(node, &adev->usecase_list) {
+            usecase = node_to_item(node, struct audio_usecase, list);
+            if (usecase->type == PCM_PLAYBACK) {
+                select_devices(adev, usecase->id);
+            break;
+            }
+        }
         if (!in->standby)
             select_devices(in->dev, in->usecase);
     }
@@ -3115,7 +3127,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
                                   struct audio_stream_in **stream_in,
                                   audio_input_flags_t flags __unused,
                                   const char *address __unused,
-                                  audio_source_t source __unused)
+                                  audio_source_t source)
 {
     struct audio_device *adev = (struct audio_device *)dev;
     struct stream_in *in;
@@ -3434,6 +3446,8 @@ static int adev_open(const hw_module_t *module, const char *name,
 
     if (amplifier_open() != 0)
         ALOGE("Amplifier initialization failed");
+
+    adev->enable_voicerx = false;
 
     *device = &adev->device.common;
 

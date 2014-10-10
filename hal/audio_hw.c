@@ -823,7 +823,7 @@ int select_devices(struct audio_device *adev, audio_usecase_t uc_id)
          * usecase. This is to avoid switching devices for voice call when
          * check_usecases_codec_backend() is called below.
          */
-        if (adev->voice.in_call && adev->mode == AUDIO_MODE_IN_CALL) {
+        if (adev->voice.in_call) {
             vc_usecase = get_usecase_from_list(adev,
                                                get_voice_usecase_id_from_list(adev));
             if ((vc_usecase) && ((vc_usecase->devices & AUDIO_DEVICE_OUT_ALL_CODEC_BACKEND) ||
@@ -1780,17 +1780,20 @@ static int out_set_parameters(struct audio_stream *stream, const char *kvpairs)
         if (val != 0) {
             out->devices = val;
 
-            if ((adev->mode == AUDIO_MODE_IN_CALL) &&
-                    output_drives_call(adev, out)) {
-                adev->current_call_output = out;
-                if (!adev->voice.in_call)
-                    ret = voice_start_call(adev);
-                else
-                    voice_update_devices_for_all_voice_usecases(adev);
-             }
-
             if (!out->standby)
                 select_devices(adev, out->usecase);
+
+            if (output_drives_call(adev, out)) {
+                if (!adev->voice.in_call) {
+                    if (adev->mode == AUDIO_MODE_IN_CALL) {
+                        adev->current_call_output = out;
+                        ret = voice_start_call(adev);
+                    }
+                } else {
+                    adev->current_call_output = out;
+                    voice_update_devices_for_all_voice_usecases(adev);
+                }
+             }
         }
 
         if ((adev->mode == AUDIO_MODE_NORMAL) &&

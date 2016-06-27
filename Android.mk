@@ -1,5 +1,3 @@
-ifeq ($(call my-dir),$(call project-path-for,qcom-audio))
-
 ifneq ($(filter msm8660,$(TARGET_BOARD_PLATFORM)),)
 
 MY_LOCAL_PATH := $(call my-dir)
@@ -18,8 +16,6 @@ include $(MY_LOCAL_PATH)/policy_hal/Android.mk
 include $(MY_LOCAL_PATH)/visualizer/Android.mk
 include $(MY_LOCAL_PATH)/audiod/Android.mk
 include $(MY_LOCAL_PATH)/post_proc/Android.mk
-endif
-
 endif
 
 endif

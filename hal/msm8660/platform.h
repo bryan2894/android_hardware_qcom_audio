@@ -155,7 +155,7 @@ enum {
 #define MAX_VOL_INDEX 5
 #define MIN_VOL_INDEX 0
 #define percent_to_index(val, min, max) \
-            ((val) * ((max) - (min)) * 0.01 + (min) + .5)
+            (val/20)
 
 /*
  * tinyAlsa library interprets period size as number of frames
@@ -165,8 +165,8 @@ enum {
  * We should take care of returning proper size when AudioFlinger queries for
  * the buffer size of an input/output stream
  */
-#define DEEP_BUFFER_OUTPUT_PERIOD_SIZE 1920
-#define DEEP_BUFFER_OUTPUT_PERIOD_COUNT 2
+#define DEEP_BUFFER_OUTPUT_PERIOD_SIZE 960
+#define DEEP_BUFFER_OUTPUT_PERIOD_COUNT 8
 #define LOW_LATENCY_OUTPUT_PERIOD_SIZE 240
 #define LOW_LATENCY_OUTPUT_PERIOD_COUNT 2
 
@@ -186,121 +186,52 @@ enum {
 
 #define DEEP_BUFFER_PCM_DEVICE 0
 #define AUDIO_RECORD_PCM_DEVICE 0
-#define MULTIMEDIA2_PCM_DEVICE 1
-#define FM_PLAYBACK_PCM_DEVICE 5
-#define FM_CAPTURE_PCM_DEVICE  6
-#define HFP_PCM_RX 5
+#define MULTIMEDIA2_PCM_DEVICE 2
 
-#define INCALL_MUSIC_UPLINK_PCM_DEVICE 1
+#define LOWLATENCY_PCM_DEVICE 1
+#define VOICE_CALL_PCM_DEVICE 3
 
-#ifdef PLATFORM_MSM8610
-#define INCALL_MUSIC_UPLINK2_PCM_DEVICE 15
-#elif PLATFORM_MSM8x26
-#define INCALL_MUSIC_UPLINK2_PCM_DEVICE 16
-#else
-#define INCALL_MUSIC_UPLINK2_PCM_DEVICE 35
-#endif
-
-#define SPKR_PROT_CALIB_RX_PCM_DEVICE 5
-#define SPKR_PROT_CALIB_TX_PCM_DEVICE 32
-#define PLAYBACK_OFFLOAD_DEVICE 9
-#define COMPRESS_VOIP_CALL_PCM_DEVICE 3
-
-#ifdef PLATFORM_MSM8610
-#define LOWLATENCY_PCM_DEVICE 12
-#define EC_REF_RX "SEC_I2S_RX"
-#else
-#define LOWLATENCY_PCM_DEVICE 15
-#define EC_REF_RX "SLIM_RX"
-#endif
-#ifdef PLATFORM_MSM8x26
-#define COMPRESS_CAPTURE_DEVICE 20
-#else
-#define COMPRESS_CAPTURE_DEVICE 19
-#endif
-
-#ifdef PLATFORM_MSM8x26
-#define VOICE_CALL_PCM_DEVICE 2
-#define VOICE2_CALL_PCM_DEVICE 14
-#define VOLTE_CALL_PCM_DEVICE 17
-#define QCHAT_CALL_PCM_DEVICE 18
-#define VOWLAN_CALL_PCM_DEVICE 30
-#elif PLATFORM_APQ8084
-#define VOICE_CALL_PCM_DEVICE 20
-#define VOICE2_CALL_PCM_DEVICE 13
-#define VOLTE_CALL_PCM_DEVICE 21
-#define QCHAT_CALL_PCM_DEVICE 06
-#define VOWLAN_CALL_PCM_DEVICE -1
-#elif PLATFORM_MSM8610
-#define VOICE_CALL_PCM_DEVICE 2
-#define VOICE2_CALL_PCM_DEVICE 13
-#define VOLTE_CALL_PCM_DEVICE 15
-#define QCHAT_CALL_PCM_DEVICE 14
-#define VOWLAN_CALL_PCM_DEVICE -1
-#else
-#define VOICE_CALL_PCM_DEVICE 2
-#define VOICE2_CALL_PCM_DEVICE 22
-#define VOLTE_CALL_PCM_DEVICE 14
-#define QCHAT_CALL_PCM_DEVICE 20
-#define VOWLAN_CALL_PCM_DEVICE 36
-#endif
-
-#define AFE_PROXY_PLAYBACK_PCM_DEVICE 7
-#define AFE_PROXY_RECORD_PCM_DEVICE 8
-
-#ifdef PLATFORM_MSM8x26
-#define HFP_SCO_RX 28
-#define HFP_ASM_RX_TX 29
-#else
-#define HFP_SCO_RX 23
-#define HFP_ASM_RX_TX 24
-#endif
-
-#define LIB_CSD_CLIENT "libcsd-client.so"
+#define LIB_MSM_CLIENT "libaudioalsa.so"
 #define MIXER_CARD 0
-/* CSD-CLIENT related functions */
-typedef int (*init_t)();
-typedef int (*deinit_t)();
-typedef int (*disable_device_t)();
-typedef int (*enable_device_t)(int, int, uint32_t);
-#ifdef NEW_CSDCLIENT
-typedef int (*volume_t)(uint32_t, int);
-typedef int (*mic_mute_t)(uint32_t, int);
-typedef int (*slow_talk_t)(uint32_t, uint8_t);
-typedef int (*start_voice_t)(uint32_t);
-typedef int (*stop_voice_t)(uint32_t);
-typedef int (*start_playback_t)(uint32_t);
-typedef int (*stop_playback_t)(uint32_t);
-typedef int (*start_record_t)(uint32_t, int);
-typedef int (*stop_record_t)(uint32_t);
-#else
-typedef int (*volume_t)(int);
-typedef int (*mic_mute_t)(int);
-typedef int (*slow_talk_t)(uint8_t);
-typedef int (*start_voice_t)();
-typedef int (*stop_voice_t)();
-typedef int (*start_playback_t)();
-typedef int (*stop_playback_t)();
-typedef int (*start_record_t)(int);
-typedef int (*stop_record_t)();
+
+#define VOICE_SESSION_NAME "Voice session"
+
+/* Legacy msm funcions */
+typedef int (*msm_set_voice_rx_vol_t)(int);
+typedef void (*msm_set_voice_tx_mute_t)(int);
+typedef void (*msm_start_voice_t)(void);
+typedef int (*msm_end_voice_t)(void);
+typedef int (*msm_mixer_open_t)(const char*, int);
+typedef void (*msm_mixer_close_t)(void);
+typedef int (*msm_reset_all_device_t)(void);
+#ifndef LEGACY_QCOM_VOICE
+typedef int (*msm_get_voc_session_t)(const char*);
+typedef int (*msm_start_voice_ext_t)(int);
+typedef int (*msm_end_voice_ext_t)(int);
+typedef int (*msm_set_voice_tx_mute_ext_t)(int, int);
+typedef int (*msm_set_voice_rx_vol_ext_t)(int, int);
 #endif
 
-/* CSD Client structure */
-struct csd_data {
-    void *csd_client;
-    init_t init;
-    deinit_t deinit;
-    disable_device_t disable_device;
-    enable_device_t enable_device;
-    volume_t volume;
-    mic_mute_t mic_mute;
-    slow_talk_t slow_talk;
-    start_voice_t start_voice;
-    stop_voice_t stop_voice;
-    start_playback_t start_playback;
-    stop_playback_t stop_playback;
-    start_record_t start_record;
-    stop_record_t stop_record;
+/* MSM Client structure */
+struct msm_data {
+    /* msm functions for voice call */
+    void *msm_client;
+    msm_set_voice_rx_vol_t msm_set_voice_rx_vol;
+    msm_set_voice_tx_mute_t msm_set_voice_tx_mute;
+    msm_start_voice_t msm_start_voice;
+    msm_end_voice_t msm_end_voice;
+    msm_mixer_open_t msm_mixer_open;
+    msm_mixer_close_t msm_mixer_close;
+    msm_reset_all_device_t msm_reset_all_device;
+#ifndef LEGACY_QCOM_VOICE
+    msm_get_voc_session_t msm_get_voc_session;
+    msm_start_voice_ext_t msm_start_voice_ext;
+    msm_end_voice_ext_t msm_end_voice_ext;
+    msm_set_voice_tx_mute_ext_t msm_set_voice_tx_mute_ext;
+    msm_set_voice_rx_vol_ext_t msm_set_voice_rx_vol_ext;
+#endif
+
+    int voice_session_id;
 };
 
 #ifdef MOTOROLA_EMU_AUDIO

@@ -198,11 +198,11 @@ enum {
 
 /* Legacy msm funcions */
 typedef int (*msm_set_voice_rx_vol_t)(int);
-typedef void (*msm_set_voice_tx_mute_t)(int);
-typedef void (*msm_start_voice_t)(void);
+typedef int (*msm_set_voice_tx_mute_t)(int);
+typedef int (*msm_start_voice_t)(void);
 typedef int (*msm_end_voice_t)(void);
 typedef int (*msm_mixer_open_t)(const char*, int);
-typedef void (*msm_mixer_close_t)(void);
+typedef int (*msm_mixer_close_t)(void);
 typedef int (*msm_reset_all_device_t)(void);
 #ifndef LEGACY_QCOM_VOICE
 typedef int (*msm_get_voc_session_t)(const char*);
@@ -211,6 +211,9 @@ typedef int (*msm_end_voice_ext_t)(int);
 typedef int (*msm_set_voice_tx_mute_ext_t)(int, int);
 typedef int (*msm_set_voice_rx_vol_ext_t)(int, int);
 #endif
+typedef const char ** (*msm_get_device_list_t)(void);
+typedef int (*msm_get_device_t)(const char * name);
+typedef int (*msm_get_device_count_t)(void);
 
 /* MSM Client structure */
 struct msm_data {
@@ -230,8 +233,20 @@ struct msm_data {
     msm_set_voice_tx_mute_ext_t msm_set_voice_tx_mute_ext;
     msm_set_voice_rx_vol_ext_t msm_set_voice_rx_vol_ext;
 #endif
+    msm_get_device_list_t msm_get_device_list;
+    msm_get_device_t msm_get_device;
+    msm_get_device_count_t msm_get_device_count;
 
     int voice_session_id;
+};
+
+#define MAX_DEVICE_COUNT 200
+
+struct device_table
+{
+    const char ** name;
+    int dev_id[MAX_DEVICE_COUNT];
+    int acdb_id[MAX_DEVICE_COUNT];
 };
 
 #ifdef MOTOROLA_EMU_AUDIO

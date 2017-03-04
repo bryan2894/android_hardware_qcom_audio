@@ -110,7 +110,9 @@ typedef int  (*acdb_init_t)();
 typedef void (*acdb_send_audio_cal_t)(int, int);
 typedef void (*acdb_send_voice_cal_t)(int, int);
 typedef int (*acdb_loader_get_calibration_t)(char *attr, int size, void *data);
+typedef void (*acdb_mapper_get_acdb_id_from_dev_name_t)(char *name, int *id);
 acdb_loader_get_calibration_t acdb_loader_get_calibration;
+acdb_mapper_get_acdb_id_from_dev_name_t acdb_mapper_get_acdb_id_from_dev_name;
 
 struct platform_data {
     struct audio_device *adev;
@@ -131,6 +133,7 @@ struct platform_data {
 
     void *hw_info;
     struct msm_data *msm;
+    struct device_table *device_list;
 
     int max_vol_index;
 };
@@ -485,6 +488,12 @@ static struct msm_data *open_msm_client()
         msm->msm_set_voice_rx_vol_ext = (msm_set_voice_rx_vol_ext_t)dlsym(msm->msm_client,
                       "msm_set_voice_rx_vol_ext");
 #endif
+        msm->msm_get_device_count = (msm_get_device_count_t)dlsym(msm->msm_client,
+                      "msm_get_device_count");
+        msm->msm_get_device_list = (msm_get_device_list_t)dlsym(msm->msm_client,
+                      "msm_get_device_list");
+        msm->msm_get_device = (msm_get_device_t)dlsym(msm->msm_client,
+                      "msm_get_device");
 
         msm->voice_session_id = 0;
 
@@ -520,6 +529,202 @@ void close_msm_client(struct msm_data *msm)
         free(msm);
         msm = NULL;
     }
+}
+
+void device_list_init(struct platform_data *plat_data)
+{
+    int rc, dev_cnt, i, index = 0;
+    struct device_table *device_list = NULL;
+
+    dev_cnt = plat_data->msm->msm_get_device_count();
+    ALOGV("got device_count %d", dev_cnt);
+    if (dev_cnt <= 0) {
+        ALOGE("%s: NO devices registered", __func__);
+        return;
+    }
+
+    device_list = calloc(1, sizeof(struct device_table));
+
+    if (!device_list) {
+        ALOGE("%s: failed to allocate device list", __func__);
+        return;
+    }
+
+    device_list->name = plat_data->msm->msm_get_device_list();
+
+    if (device_list->name == NULL) {
+        ALOGE("%s: unable to load device list", __func__);
+        free(device_list);
+        device_list = NULL;
+        return;
+    }
+
+    acdb_mapper_get_acdb_id_from_dev_name = (acdb_mapper_get_acdb_id_from_dev_name_t)
+          dlsym(plat_data->acdb_handle, "acdb_mapper_get_acdb_id_from_dev_name");
+
+    if (acdb_mapper_get_acdb_id_from_dev_name == NULL) {
+        ALOGE("%s: ERROR. dlsym Error:%s acdb_mapper_get_acdb_id_from_dev_name", __func__,
+           dlerror());
+        free(device_list);
+        device_list = NULL;
+        return;
+    }
+
+    for(i = 0; i < MAX_DEVICE_COUNT; i++)
+        device_list->dev_id[i] = -1;
+
+    for(i = 0; i < dev_cnt; i++) {
+        if(strcmp((char* )device_list->name[i],"handset_rx") == 0) {
+            index = SND_DEVICE_OUT_HANDSET;
+        }
+#ifndef SAMSUNG_AUDIO
+        else if(strcmp((char* )device_list->name[i],"handset_tx") == 0) {
+            index = SND_DEVICE_IN_HANDSET_MIC;
+        }
+#endif
+        else if((strcmp((char* )device_list->name[i],"speaker_stereo_rx") == 0) ||
+                (strcmp((char* )device_list->name[i],"speaker_stereo_rx_playback") == 0) ||
+                (strcmp((char* )device_list->name[i],"speaker_rx") == 0)) {
+            index = SND_DEVICE_OUT_SPEAKER;
+        }
+        else if((strcmp((char* )device_list->name[i],"speaker_mono_tx") == 0) || (strcmp((char* )device_list->name[i],"speaker_tx") == 0)) {
+            index = SND_DEVICE_IN_SPEAKER_MIC;
+        }
+        else if((strcmp((char* )device_list->name[i],"headset_stereo_rx") == 0) || (strcmp((char* )device_list->name[i],"headset_rx") == 0)) {
+            index = SND_DEVICE_OUT_HEADPHONES;
+        }
+        else if((strcmp((char* )device_list->name[i],"headset_mono_tx") == 0) || (strcmp((char* )device_list->name[i],"headset_tx") == 0)) {
+            index = SND_DEVICE_IN_HEADSET_MIC;
+        }
+/*
+        else if(strcmp((char* )device_list->name[i],"fmradio_handset_rx") == 0) {
+            index = DEVICE_FMRADIO_HANDSET_RX;
+        }
+        else if((strcmp((char* )device_list->name[i],"fmradio_headset_rx") == 0) || (strcmp((char* )device_list->name[i],"fm_radio_headset_rx") == 0)) {
+            index = DEVICE_FMRADIO_HEADSET_RX;
+        }
+        else if((strcmp((char* )device_list->name[i],"fmradio_speaker_rx") == 0) || (strcmp((char* )device_list->name[i],"fm_radio_speaker_rx") == 0)) {
+            index = DEVICE_FMRADIO_SPEAKER_RX;
+        }
+*/
+        else if((strcmp((char* )device_list->name[i],"handset_dual_mic_endfire_tx") == 0) || (strcmp((char* )device_list->name[i],"dualmic_handset_ef_tx") == 0)) {
+            if (plat_data->fluence_type == FLUENCE_DUAL_MIC) {
+                 index = SND_DEVICE_IN_VOICE_DMIC;
+            } else {
+                 ALOGV("Endfire handset found but user request for %d\n", plat_data->fluence_type);
+                 continue;
+            }
+        }
+        else if((strcmp((char* )device_list->name[i],"speaker_dual_mic_endfire_tx") == 0)|| (strcmp((char* )device_list->name[i],"dualmic_speaker_ef_tx") == 0)) {
+            if (plat_data->fluence_type == FLUENCE_DUAL_MIC) {
+                 index = SND_DEVICE_IN_VOICE_SPEAKER_DMIC;
+            } else {
+                 ALOGV("Endfire speaker found but user request for %d\n", plat_data->fluence_type);
+                 continue;
+            }
+        }
+/*
+        else if(strcmp((char* )device_list->name[i],"handset_dual_mic_broadside_tx") == 0) {
+            if (fluence_mode == FLUENCE_MODE_BROADSIDE) {
+                 index = DEVICE_DUALMIC_HANDSET_TX;
+            } else {
+                 ALOGV("Broadside handset found but user request for %d\n", fluence_mode);
+                 continue;
+            }
+        }
+        else if(strcmp((char* )device_list->name[i],"speaker_dual_mic_broadside_tx") == 0) {
+            if (fluence_mode == FLUENCE_MODE_BROADSIDE) {
+                 index = DEVICE_DUALMIC_SPEAKER_TX;
+            } else {
+                 ALOGV("Broadside speaker found but user request for %d\n", fluence_mode);
+                 continue;
+            }
+        }
+*/
+        else if((strcmp((char* )device_list->name[i],"tty_headset_mono_rx") == 0) || (strcmp((char* )device_list->name[i],"tty_headset_rx") == 0)) {
+            index = SND_DEVICE_OUT_VOICE_TTY_FULL_HEADPHONES;
+        }
+        else if((strcmp((char* )device_list->name[i],"tty_headset_mono_tx") == 0) || (strcmp((char* )device_list->name[i],"tty_headset_tx") == 0)) {
+            index = SND_DEVICE_IN_VOICE_TTY_FULL_HEADSET_MIC;
+        }
+        else if((strcmp((char* )device_list->name[i],"bt_sco_rx") == 0) || (strcmp((char* )device_list->name[i],"bt_sco_mono_rx") == 0)) {
+            index = SND_DEVICE_OUT_BT_SCO;
+        }
+        else if((strcmp((char* )device_list->name[i],"bt_sco_tx") == 0) || (strcmp((char* )device_list->name[i],"bt_sco_mono_tx") == 0)) {
+            index = SND_DEVICE_IN_BT_SCO_MIC;
+        }
+        else if((strcmp((char* )device_list->name[i],"headset_stereo_speaker_stereo_rx") == 0) ||
+                (strcmp((char* )device_list->name[i],"headset_stereo_rx_playback") == 0) ||
+                (strcmp((char* )device_list->name[i],"headset_speaker_stereo_rx") == 0) || (strcmp((char* )device_list->name[i],"speaker_headset_rx") == 0)) {
+            index = SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES;
+        }
+/*
+        else if((strcmp((char* )device_list->name[i],"fmradio_stereo_tx") == 0) || (strcmp((char* )device_list->name[i],"fm_radio_tx") == 0)) {
+            index = DEVICE_FMRADIO_STEREO_TX;
+        }
+*/
+        else if((strcmp((char* )device_list->name[i],"hdmi_stereo_rx") == 0) || (strcmp((char* )device_list->name[i],"hdmi_rx") == 0)) {
+            index = SND_DEVICE_OUT_HDMI;
+        }
+/*
+        else if(strcmp((char* )device_list->name[i],"fmradio_stereo_rx") == 0)
+            index = DEVICE_FMRADIO_STEREO_RX;
+*/
+#ifdef SAMSUNG_AUDIO
+        else if(strcmp((char* )device_list->name[i], "handset_voip_rx") == 0)
+            index = SND_DEVICE_OUT_VOIP_HANDSET;
+        else if(strcmp((char* )device_list->name[i], "handset_voip_tx") == 0)
+            index = SND_DEVICE_IN_VOIP_HANDSET_MIC;
+        else if(strcmp((char* )device_list->name[i], "speaker_voip_rx") == 0)
+            index = SND_DEVICE_OUT_VOIP_SPEAKER;
+        else if(strcmp((char* )device_list->name[i], "speaker_voip_tx") == 0)
+            index = SND_DEVICE_IN_VOIP_SPEAKER_MIC;
+        else if(strcmp((char* )device_list->name[i], "headset_voip_rx") == 0)
+            index = SND_DEVICE_OUT_VOIP_HEADPHONES;
+        else if(strcmp((char* )device_list->name[i], "headset_voip_tx") == 0)
+            index = SND_DEVICE_IN_VOIP_HEADSET_MIC;
+        else if(strcmp((char* )device_list->name[i], "handset_call_rx") == 0)
+            index = SND_DEVICE_OUT_VOICE_HANDSET;
+        else if(strcmp((char* )device_list->name[i], "handset_call_tx") == 0)
+            index = SND_DEVICE_IN_HANDSET_MIC;
+        else if(strcmp((char* )device_list->name[i], "speaker_call_rx") == 0)
+            index = SND_DEVICE_OUT_VOICE_SPEAKER;
+        else if(strcmp((char* )device_list->name[i], "speaker_call_tx") == 0)
+            index = SND_DEVICE_IN_VOICE_SPEAKER_MIC;
+        else if(strcmp((char* )device_list->name[i], "headset_call_rx") == 0)
+            index = SND_DEVICE_OUT_VOICE_HEADPHONES;
+        else if(strcmp((char* )device_list->name[i], "headset_call_tx") == 0)
+            index = SND_DEVICE_IN_VOICE_HEADSET_MIC;
+/*
+        else if(strcmp((char* )device_list->name[i], "speaker_vr_tx") == 0)
+            index = DEVICE_SPEAKER_VR_TX;
+        else if(strcmp((char* )device_list->name[i], "headset_vr_tx") == 0)
+            index = DEVICE_HEADSET_VR_TX;
+*/
+#endif
+        else if((strcmp((char* )device_list->name[i], "camcoder_tx") == 0) ||
+#ifdef SONY_AUDIO
+                (strcmp((char* )device_list->name[i], "secondary_mic_tx") == 0))
+#else
+                (strcmp((char* )device_list->name[i], "camcorder_tx") == 0) ||
+                (strcmp((char* )device_list->name[i], "handset_lgcam_tx") == 0))
+#endif
+            index = SND_DEVICE_IN_CAMCORDER_MIC;
+        else {
+            ALOGI("Not used device: %s", ( char* )device_list->name[i]);
+            continue;
+        }
+        ALOGI("index = %d",index);
+
+        device_list->dev_id[index] = plat_data->msm->msm_get_device((char* )device_list->name[i]);
+        if(device_list->dev_id[index] >= 0) {
+                ALOGI("Found device: %s:index = %d,dev_id: %d",( char* )device_list->name[i], index, device_list->dev_id[index]);
+        }
+        acdb_mapper_get_acdb_id_from_dev_name((char* )device_list->name[i], &device_list->acdb_id[index]);
+        ALOGI("%s: acdb ID = %d for device %d", __func__, device_list->acdb_id[index], device_list->dev_id[index]);
+    }
+
+    plat_data->device_list = device_list;
 }
 
 static void set_platform_defaults(struct platform_data * my_data __unused)
@@ -623,10 +828,8 @@ void *platform_init(struct audio_device *adev)
     my_data->fluence_in_audio_rec = false;
     my_data->fluence_type = FLUENCE_NONE;
 
-    property_get("ro.qc.sdk.audio.fluencetype", my_data->fluence_cap, "");
-    if (!strncmp("fluencepro", my_data->fluence_cap, sizeof("fluencepro"))) {
-        my_data->fluence_type = FLUENCE_QUAD_MIC | FLUENCE_DUAL_MIC;
-    } else if (!strncmp("fluence", my_data->fluence_cap, sizeof("fluence"))) {
+    property_get("persist.audio.fluence.mode", my_data->fluence_cap, "");
+    if (!strncmp("endfire", my_data->fluence_cap, sizeof("endfire"))) {
         my_data->fluence_type = FLUENCE_DUAL_MIC;
     } else {
         my_data->fluence_type = FLUENCE_NONE;
@@ -700,6 +903,9 @@ void *platform_init(struct audio_device *adev)
     if (!strncmp("msm8660", platform, sizeof("msm8660"))) {
          my_data->msm = open_msm_client();
     }
+
+    /* init device list */
+    device_list_init(my_data);
 
     /* init usb */
     audio_extn_usb_init(adev);
@@ -862,8 +1068,7 @@ int platform_set_fluence_type(void *platform, char *value)
 
     /* only dual mic turn on and off is supported as of now through setparameters */
     if (!strncmp(AUDIO_PARAMETER_VALUE_DUALMIC,value, sizeof(AUDIO_PARAMETER_VALUE_DUALMIC))) {
-        if (!strncmp("fluencepro", my_data->fluence_cap, sizeof("fluencepro")) ||
-            !strncmp("fluence", my_data->fluence_cap, sizeof("fluence"))) {
+        if (!strncmp("endfire", my_data->fluence_cap, sizeof("endfire"))) {
             ALOGV("fluence dualmic feature enabled \n");
             fluence_type = FLUENCE_DUAL_MIC;
             fluence_flag = DMIC_FLAG;
@@ -943,7 +1148,11 @@ int platform_switch_voice_call_device_post(void *platform,
                                            snd_device_t in_snd_device)
 {
     struct platform_data *my_data = (struct platform_data *)platform;
-    int acdb_rx_id, acdb_tx_id;
+    const char *mixer_ctl_name_rx = "voice-rx";
+    const char *mixer_ctl_name_tx = "voice-tx";
+    struct mixer_ctl *ctl;
+    int acdb_rx_id, acdb_tx_id, dev_rx_id, dev_tx_id;
+    int rc;
 
     if (my_data->acdb_send_voice_cal == NULL) {
         ALOGE("%s: dlsym error for acdb_send_voice_call", __func__);
@@ -958,6 +1167,40 @@ int platform_switch_voice_call_device_post(void *platform,
             ALOGE("%s: Incorrect ACDB IDs (rx: %d tx: %d)", __func__,
                   acdb_rx_id, acdb_tx_id);
     }
+
+    if (out_snd_device == SND_DEVICE_OUT_VOICE_TTY_VCO_HEADPHONES)
+        dev_rx_id = my_data->device_list->dev_id[SND_DEVICE_OUT_VOICE_TTY_FULL_HEADPHONES];
+    else if (out_snd_device == SND_DEVICE_OUT_BT_SCO_WB)
+        dev_rx_id = my_data->device_list->dev_id[SND_DEVICE_OUT_BT_SCO];
+    else
+        dev_rx_id = my_data->device_list->dev_id[out_snd_device];
+
+    if (in_snd_device == SND_DEVICE_IN_VOICE_TTY_VCO_HANDSET_MIC)
+        dev_tx_id = my_data->device_list->dev_id[SND_DEVICE_IN_VOICE_TTY_FULL_HEADSET_MIC];
+    else if (in_snd_device == SND_DEVICE_IN_BT_SCO_MIC_WB)
+        dev_tx_id = my_data->device_list->dev_id[SND_DEVICE_IN_BT_SCO_MIC];
+    else
+        dev_tx_id = my_data->device_list->dev_id[in_snd_device];
+
+    ctl = mixer_get_ctl_by_name(my_data->adev->mixer, mixer_ctl_name_rx);
+    if (!ctl) {
+        ALOGE("%s: Could not get ctl for mixer cmd - %s",
+              __func__, mixer_ctl_name_rx);
+        return -EINVAL;
+    }
+    rc = mixer_ctl_set_value(ctl, 0, dev_rx_id);
+    if (rc < 0)
+        return rc;
+
+    ctl = mixer_get_ctl_by_name(my_data->adev->mixer, mixer_ctl_name_tx);
+    if (!ctl) {
+        ALOGE("%s: Could not get ctl for mixer cmd - %s",
+              __func__, mixer_ctl_name_tx);
+        return -EINVAL;
+    }
+    rc = mixer_ctl_set_value(ctl, 0, dev_tx_id);
+    if (rc < 0)
+        return rc;
 
     return 0;
 }

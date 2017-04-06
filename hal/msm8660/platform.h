@@ -199,11 +199,11 @@ enum {
 
 /* Legacy msm funcions */
 typedef int (*msm_set_voice_rx_vol_t)(int);
-typedef int (*msm_set_voice_tx_mute_t)(int);
-typedef int (*msm_start_voice_t)(void);
+typedef void (*msm_set_voice_tx_mute_t)(int);
+typedef void (*msm_start_voice_t)(void);
 typedef int (*msm_end_voice_t)(void);
 typedef int (*msm_mixer_open_t)(const char*, int);
-typedef int (*msm_mixer_close_t)(void);
+typedef void (*msm_mixer_close_t)(void);
 typedef int (*msm_reset_all_device_t)(void);
 #ifndef LEGACY_QCOM_VOICE
 typedef int (*msm_get_voc_session_t)(const char*);

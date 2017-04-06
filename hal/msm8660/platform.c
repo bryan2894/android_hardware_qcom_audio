@@ -1220,7 +1220,7 @@ int platform_start_voice_call(void *platform, uint32_t vsid __unused)
 
     if (my_data->msm != NULL) {
 #ifdef LEGACY_QCOM_VOICE
-        ret = my_data->msm->msm_start_voice();
+        my_data->msm->msm_start_voice();
 #else
         my_data->msm->voice_session_id = my_data->msm->msm_get_voc_session(VOICE_SESSION_NAME);
         if (my_data->msm->voice_session_id <= 0) {
@@ -1286,7 +1286,7 @@ int platform_set_mic_mute(void *platform, bool state)
 
     if (my_data->msm != NULL) {
 #ifdef LEGACY_QCOM_VOICE
-        ret = my_data->msm->msm_set_voice_tx_mute(state);
+        my_data->msm->msm_set_voice_tx_mute(state);
 #else
         ret = my_data->msm->msm_set_voice_tx_mute_ext(state, my_data->msm->voice_session_id);
 #endif

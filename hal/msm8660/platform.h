@@ -190,7 +190,8 @@ enum {
 #define MULTIMEDIA2_PCM_DEVICE 2
 
 #define LOWLATENCY_PCM_DEVICE 1
-#define VOICE_CALL_PCM_DEVICE 3
+#define VOICE_CALL_PCM_DEVICE 4
+#define PLAYBACK_OFFLOAD_DEVICE 3
 
 #define LIB_MSM_CLIENT "libaudioalsa.so"
 #define MIXER_CARD 0

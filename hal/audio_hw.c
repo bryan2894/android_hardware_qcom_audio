@@ -55,7 +55,8 @@
 #include "sound/compress_params.h"
 #include "sound/asound.h"
 
-#define COMPRESS_OFFLOAD_NUM_FRAGMENTS 4
+// 2 buffers causes problems with high bitrate files
+#define COMPRESS_OFFLOAD_NUM_FRAGMENTS 3
 /* ToDo: Check and update a proper value in msec */
 #define COMPRESS_OFFLOAD_PLAYBACK_LATENCY 96
 #define COMPRESS_PLAYBACK_VOLUME_MAX 0x2000

@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2012 The CyanogenMod Project
+ * Copyright (c) 2009, The Android Open-Source Project
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2013, The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +16,15 @@
  * limitations under the License.
  */
 
-#ifndef __MSM_ACDB_CONTROL
-#define __MSM_ACDB_CONTROL
+#ifndef __MSM_AUDIO_CALIBRATION
+#define __MSM_AUDIO_CALIBRATION
+
+#include <sys/cdefs.h>
 
 __BEGIN_DECLS
 
-int acdb_loader_send_anc_cal(int id);
-void acdb_loader_send_audio_cal(int id, int capability);
-void acdb_loader_send_voice_cal(int tx_id, int rx_id);
-void acdb_mapper_get_acdb_id_from_dev_name(char *name, int *id);
-int acdb_loader_init_ACDB();
-void acdb_loader_deallocate_ACDB();
+extern void audcal_initialize(void);
+extern void audcal_deinitialize(void);
 
 __END_DECLS
 

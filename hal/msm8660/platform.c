@@ -42,6 +42,7 @@
 
 #define MIXER_XML_PATH "/system/etc/mixer_paths.xml"
 #define LIB_ACDB_LOADER "libacdbloader.so"
+#define LIB_ACDB_MAPPER "libacdbmapper.so"
 #define AUDIO_DATA_BLOCK_MIXER_CTL "HDMI EDID"
 
 #define MAX_COMPRESS_OFFLOAD_FRAGMENT_SIZE (256 * 1024)
@@ -126,6 +127,7 @@ struct platform_data {
     bool slowtalk;
     /* Audio calibration related functions */
     void                       *acdb_handle;
+    void                       *acdbm_handle;
     acdb_init_t                acdb_init;
     acdb_deallocate_t          acdb_deallocate;
     acdb_send_audio_cal_t      acdb_send_audio_cal;
@@ -566,7 +568,7 @@ void device_list_init(struct platform_data *plat_data)
     }
 
     acdb_mapper_get_acdb_id_from_dev_name = (acdb_mapper_get_acdb_id_from_dev_name_t)
-          dlsym(plat_data->acdb_handle, "acdb_mapper_get_acdb_id_from_dev_name");
+          dlsym(plat_data->acdbm_handle, "acdb_mapper_get_acdb_id_from_dev_name");
 
     if (acdb_mapper_get_acdb_id_from_dev_name == NULL) {
         ALOGE("%s: ERROR. dlsym Error:%s acdb_mapper_get_acdb_id_from_dev_name", __func__,
@@ -890,6 +892,13 @@ void *platform_init(struct audio_device *adev)
             ALOGE("%s: dlsym error %s for acdb_loader_init_ACDB", __func__, dlerror());
         else
             my_data->acdb_init();
+    }
+
+    my_data->acdbm_handle = dlopen(LIB_ACDB_MAPPER, RTLD_NOW);
+    if (my_data->acdbm_handle == NULL) {
+        ALOGE("%s: DLOPEN failed for %s", __func__, LIB_ACDB_MAPPER);
+    } else {
+        ALOGV("%s: DLOPEN successful for %s", __func__, LIB_ACDB_MAPPER);
     }
 
     set_platform_defaults(my_data);
@@ -1512,9 +1521,9 @@ snd_device_t platform_get_output_snd_device(void *platform, audio_devices_t devi
                 snd_device = SND_DEVICE_OUT_VOIP_HANDSET;
             else
                 snd_device = SND_DEVICE_OUT_VOICE_HANDSET;
-        } else if (devices & AUDIO_DEVICE_OUT_TELEPHONY_TX)
+        }/* else if (devices & AUDIO_DEVICE_OUT_TELEPHONY_TX)
                 snd_device = SND_DEVICE_OUT_VOICE_TX;
-
+*/
         if (snd_device != SND_DEVICE_NONE) {
             goto exit;
         }
@@ -1676,8 +1685,8 @@ snd_device_t platform_get_input_snd_device(void *platform, audio_devices_t out_d
                     snd_device = SND_DEVICE_IN_VOICE_SPEAKER_MIC;
                 set_echo_reference(adev, true);
             }
-        } else if (out_device & AUDIO_DEVICE_OUT_TELEPHONY_TX)
-            snd_device = SND_DEVICE_IN_VOICE_RX;
+        }/* else if (out_device & AUDIO_DEVICE_OUT_TELEPHONY_TX)
+            snd_device = SND_DEVICE_IN_VOICE_RX;*/
     } else if (source == AUDIO_SOURCE_CAMCORDER) {
         if (in_device & AUDIO_DEVICE_IN_BUILTIN_MIC ||
             in_device & AUDIO_DEVICE_IN_BACK_MIC) {
@@ -1768,8 +1777,10 @@ snd_device_t platform_get_input_snd_device(void *platform, audio_devices_t out_d
                 set_echo_reference(adev, true);
             }
         }
+/*
     } else if (source == AUDIO_SOURCE_FM_TUNER) {
         snd_device = SND_DEVICE_IN_CAPTURE_FM;
+*/
     } else if (source == AUDIO_SOURCE_DEFAULT) {
         goto exit;
     }
@@ -1808,8 +1819,10 @@ snd_device_t platform_get_input_snd_device(void *platform, audio_devices_t out_d
             else
 #endif
             snd_device = SND_DEVICE_IN_USB_HEADSET_MIC;
+/*
         } else if (in_device & AUDIO_DEVICE_IN_FM_TUNER) {
             snd_device = SND_DEVICE_IN_CAPTURE_FM;
+*/
         } else {
             ALOGE("%s: Unknown input device(s) %#x", __func__, in_device);
             ALOGW("%s: Using default handset-mic", __func__);
